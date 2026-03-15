@@ -34,7 +34,7 @@ In March 2025, the Ramanujan Machine team showed that **94% of all known formula
 
 ## What this project does
 
-This repo contains two interactive tools built in React:
+This repo contains two interactive tools built in HTML:
 
 ### 1. CMF Explorer
 
