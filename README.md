@@ -38,7 +38,7 @@ This repo contains two interactive tools built in React:
 
 ### 1. CMF Explorer
 
-[[demo](cmf-explorer.html)]
+[[demo](https://alexmorleyfinch.github.io/constantbrot/cmf-explorer.html)]
 
 An interactive tool that lets you select a fundamental constant and watch its polynomial continued fraction converge in real-time. Features:
 
@@ -50,7 +50,7 @@ An interactive tool that lets you select a fundamental constant and watch its po
 
 ### 2. The Constantbrot
 
-[[demo](cmf-fractal.html)]
+[[demo](https://alexmorleyfinch.github.io/constantbrot/cmf-fractal.html)]
 
 A Mandelbrot-style fractal explorer that maps the CMF parameter space. For each pixel at coordinates (A, B):
 
