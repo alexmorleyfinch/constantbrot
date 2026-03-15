@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMF Explorer — Conservative Matrix Field</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #08080d; color: #d4d4dc; min-height: 100vh;
+    font-family: "SF Mono", "Fira Code", "JetBrains Mono", "Consolas", monospace;
+    padding: 20px 16px;
+  }
+  .center { text-align: center; }
+  .sup { font-size: 18px; letter-spacing: 5px; color: rgba(255,255,255,0.2); text-transform: uppercase; }
+  h1 {
+    font-size: 44px; font-weight: 300; margin: 4px 0;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .desc { font-size: 18px; color: rgba(255,255,255,0.25); }
+  .tabs { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
+  .tab {
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.4); border-radius: 5px; padding: 6px 12px;
+    cursor: pointer; font-size: 24px; font-family: inherit; transition: all 0.15s;
+  }
+  .tab.active { background: var(--cclr15); border-color: var(--cclr50); color: var(--cclr); }
+  .box {
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 6px; padding: 12px 16px; margin-bottom: 14px; text-align: center;
+  }
+  .box-label { font-size: 18px; letter-spacing: 3px; color: rgba(255,255,255,0.2); text-transform: uppercase; margin-bottom: 6px; }
+  .poly { font-size: 24px; margin: 0; line-height: 1.6; white-space: pre-wrap; opacity: 0.9; }
+  .formula { text-align: center; margin-bottom: 14px; }
+  .formula .main { font-size: 22px; color: rgba(255,255,255,0.45); margin-bottom: 2px; }
+  .formula .sub { font-size: 20px; color: rgba(255,255,255,0.2); }
+  .slider-row { display: flex; justify-content: center; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .slider-label { font-size: 18px; color: rgba(255,255,255,0.25); letter-spacing: 2px; text-transform: uppercase; }
+  .canvas-wrap { display: flex; justify-content: center; margin-bottom: 16px; }
+  canvas { border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
+  .results { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; max-width: 900px; margin: 0 auto 16px; }
+  .result-card {
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 6px; padding: 10px 8px; text-align: center;
+  }
+  .result-label { font-size: 16px; letter-spacing: 2px; color: rgba(255,255,255,0.2); text-transform: uppercase; margin-bottom: 4px; }
+  .result-val { font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+  .table-wrap {
+    background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 6px; overflow: hidden; max-width: 900px; margin: 0 auto 20px;
+  }
+  .table-head { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 18px; letter-spacing: 2px; color: rgba(255,255,255,0.2); text-transform: uppercase; }
+  .table-scroll { max-height: 240px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 22px; }
+  th { padding: 6px 10px; color: rgba(255,255,255,0.3); font-weight: 400; }
+  td { padding: 4px 10px; font-variant-numeric: tabular-nums; }
+  tr { border-bottom: 1px solid rgba(255,255,255,0.02); }
+  thead tr { border-bottom: 1px solid rgba(255,255,255,0.04); position: sticky; top: 0; background: #08080d; }
+  .insight {
+    max-width: 900px; margin: 0 auto 20px; border-radius: 6px; padding: 12px 16px; display: none;
+  }
+  .insight-label { font-size: 20px; opacity: 0.7; margin-bottom: 4px; letter-spacing: 1px; text-transform: uppercase; }
+  .insight-text { font-size: 22px; color: rgba(255,255,255,0.5); line-height: 1.6; }
+  .footer { text-align: center; font-size: 18px; color: rgba(255,255,255,0.12); line-height: 1.5; padding-bottom: 12px; }
+  input[type="range"] { width: 200px; }
+  .float-nav {
+    position: fixed; top: 12px; right: 12px; z-index: 1000;
+    display: inline-flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, #ec4899 0%, #f97316 40%, #8b5cf6 100%);
+    padding: 12px 18px; font-size: 15px; font-weight: 800; font-family: inherit;
+    text-decoration: none; color: #fff; letter-spacing: 5px; text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<a href="cmf-fractal.html" class="float-nav">→ Fractal</a>
+
+<div class="center" style="margin-bottom:24px">
+  <div class="sup">Conservative Matrix Field Explorer</div>
+  <h1 id="title">Two Polynomials → ζ(3)</h1>
+  <div class="desc" id="description">Apéry's constant — the sum of inverse cubes</div>
+</div>
+
+<div class="tabs" id="const-tabs"></div>
+
+<div class="box">
+  <div class="box-label">Conjugate Polynomials · Degree <span id="degree">3</span></div>
+  <pre class="poly" id="polynomials"></pre>
+</div>
+
+<div class="tabs" id="line-tabs"></div>
+
+<div class="formula">
+  <div class="main" id="sublabel"></div>
+  <div class="sub" id="transformLabel"></div>
+</div>
+
+<div class="slider-row">
+  <span class="slider-label">Terms: <span id="term-count">40</span></span>
+  <input type="range" id="terms-slider" min="5" max="60" value="40">
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="graph" width="900" height="320"></canvas>
+</div>
+
+<div class="results">
+  <div class="result-card">
+    <div class="result-label">Converged</div>
+    <div class="result-val" id="r-converged" style="color:#f472b6">—</div>
+  </div>
+  <div class="result-card">
+    <div class="result-label">Known Value</div>
+    <div class="result-val" id="r-known" style="color:rgba(255,255,255,0.6)">—</div>
+  </div>
+  <div class="result-card">
+    <div class="result-label">Error</div>
+    <div class="result-val" id="r-error" style="color:#ef4444">—</div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <div class="table-head">Step-by-step convergence</div>
+  <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th style="text-align:left">n</th>
+        <th style="text-align:right">Raw CF Value</th>
+        <th style="text-align:right" id="th-symbol">→ ζ(3)</th>
+        <th style="text-align:right">Error</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="insight" id="insight">
+  <div class="insight-label" id="insight-label">The lattice insight</div>
+  <div class="insight-text">
+    Each row of the CMF grid produces a <em>different</em> continued fraction that converges to the same constant.
+    Higher rows converge faster — try switching between y=1, y=2, y=3 and watch the error plummet.
+    These aren't different formulas by coincidence. They're parallel paths through the same conservative matrix field.
+  </div>
+</div>
+
+<div class="footer">Based on David et al. — "The Conservative Matrix Field" (2023) · Ramanujan Machine Project · Technion</div>
+
+<script>
+// ─── Math ──────────────────────────────────────────────────
+function evalGCF(a0, aFunc, bFunc, n) {
+  let pP=1,pC=a0,qP=0,qC=1;
+  const steps=[{n:0,val:a0}];
+  for(let k=1;k<=n;k++){
+    const a=aFunc(k),b=bFunc(k);
+    const pN=a*pC+b*pP,qN=a*qC+b*qP;
+    pP=pC;qP=qC;pC=pN;qC=qN;
+    steps.push({n:k,val:pC/qC});
+  }
+  return steps;
+}
+
+// ─── Constants ─────────────────────────────────────────────
+const CONSTANTS = {
+  zeta3: {
+    name:"ζ(3)", symbol:"ζ(3)", target:1.2020569031595942, color:"#f472b6",
+    degree:3, polynomials:"f(x,y) = x³+2x²y+2xy²+y³\nf̄(x,y) = f(−x, y)",
+    description:"Apéry's constant — the sum of inverse cubes",
+    lines:[
+      { label:"y = 1", sublabel:"1/ζ(3) = 1 + K(−k⁶ / (k³+(k+1)³))", a0:1,
+        a:k=>Math.pow(k,3)+Math.pow(k+1,3), b:k=>-Math.pow(k,6),
+        transform:v=>1/v, transformLabel:"ζ(3) = 1/v" },
+      { label:"y = 2", sublabel:"Faster: adds +4(2k+1) to denominator", a0:5,
+        a:k=>Math.pow(k,3)+Math.pow(k+1,3)+4*(2*k+1), b:k=>-Math.pow(k,6),
+        transform:v=>1+1/v, transformLabel:"ζ(3) = 1 + 1/v" },
+      { label:"y = 3", sublabel:"Even faster: adds +12(2k+1)", a0:13,
+        a:k=>Math.pow(k,3)+Math.pow(k+1,3)+12*(2*k+1), b:k=>-Math.pow(k,6),
+        transform:v=>9/8+1/v, transformLabel:"ζ(3) = 9/8 + 1/v" },
+    ],
+  },
+  pi: {
+    name:"π", symbol:"π", target:Math.PI, color:"#fb923c",
+    degree:1, polynomials:"f(x,y) = 1 + 2(x+y)\nf̄(x,y) = y − x",
+    description:"The ratio of circumference to diameter — from two linear polynomials",
+    lines:[
+      { label:"Brouncker / CMF", sublabel:"4/π = 1 + K(k² / (2k+1))", a0:1,
+        a:k=>2*k+1, b:k=>k*k, transform:v=>4/v, transformLabel:"π = 4/v" },
+    ],
+  },
+  e_const: {
+    name:"e", symbol:"e", target:Math.E, color:"#a78bfa",
+    degree:1, polynomials:"f(x,y) = x + y\nf̄(x,y) = 1",
+    description:"Euler's number — a linear polynomial against a constant",
+    lines:[
+      { label:"Euler CF", sublabel:"e = [2; 1, 2, 1, 1, 4, 1, 1, 6, ...]", custom:true,
+        compute(n){
+          function t(k){if(k===0)return 2;if(k%3===2)return 2*Math.floor(k/3+1);return 1;}
+          let pP=1,pC=2,qP=0,qC=1; const s=[{n:0,val:2}];
+          for(let k=1;k<=n;k++){const a=t(k);const pN=a*pC+pP,qN=a*qC+qP;pP=pC;qP=qC;pC=pN;qC=qN;s.push({n:k,val:pC/qC});}
+          return s;
+        }, transform:v=>v, transformLabel:"e = v" },
+      { label:"Series: Σ 1/n!", sublabel:"The Taylor series — blazing fast", custom:true,
+        compute(n){let s=0,f=1;const r=[];for(let k=0;k<=n;k++){if(k>0)f*=k;s+=1/f;r.push({n:k,val:s});}return r;},
+        transform:v=>v, transformLabel:"e = v" },
+    ],
+  },
+  zeta2: {
+    name:"ζ(2) = π²/6", symbol:"π²/6", target:Math.PI*Math.PI/6, color:"#4ade80",
+    degree:2, polynomials:"f(x,y) = 2x²+2xy+y²\nf̄(x,y) = −f(−x, y)",
+    description:"Basel problem — the sum of inverse squares",
+    lines:[
+      { label:"CMF y=1", sublabel:"From degree-2 conjugate pair", a0:2,
+        a:k=>2*(2*k*k+2*k+1), b:k=>-4*Math.pow(k,4),
+        transform:v=>1/v, transformLabel:"ζ(2) = 1/v" },
+    ],
+  },
+  ln2: {
+    name:"ln(2)", symbol:"ln(2)", target:Math.log(2), color:"#22d3ee",
+    degree:1, polynomials:"f(x,y) = x + y\nf̄(x,y) = x − y",
+    description:"The natural log of 2 — a mirror-image polynomial pair",
+    lines:[
+      { label:"Mercator / Euler CF", sublabel:"ln(2) via generalized CF", custom:true,
+        compute(n){
+          let pP=1,pC=1,qP=0,qC=1;const s=[{n:0,val:1}];
+          for(let k=1;k<=n;k++){const b=Math.ceil(k/2)**2,a=k+1;const pN=a*pC+b*pP,qN=a*qC+b*qP;pP=pC;qP=qC;pC=pN;qC=qN;s.push({n:k,val:pC/qC});}
+          return s;
+        }, transform:v=>v, transformLabel:"ln(2) = v" },
+    ],
+  },
+};
+
+// ─── State ─────────────────────────────────────────────────
+let selectedKey = "zeta3";
+let lineIdx = 0;
+let numTerms = 40;
+
+// ─── DOM refs ──────────────────────────────────────────────
+const $title = document.getElementById("title");
+const $desc = document.getElementById("description");
+const $degree = document.getElementById("degree");
+const $poly = document.getElementById("polynomials");
+const $sublabel = document.getElementById("sublabel");
+const $tLabel = document.getElementById("transformLabel");
+const $termCount = document.getElementById("term-count");
+const $slider = document.getElementById("terms-slider");
+const $canvas = document.getElementById("graph");
+const $rConv = document.getElementById("r-converged");
+const $rKnown = document.getElementById("r-known");
+const $rErr = document.getElementById("r-error");
+const $thSym = document.getElementById("th-symbol");
+const $tbody = document.getElementById("tbody");
+const $constTabs = document.getElementById("const-tabs");
+const $lineTabs = document.getElementById("line-tabs");
+const $insight = document.getElementById("insight");
+const $insightLabel = document.getElementById("insight-label");
+
+// ─── Render ────────────────────────────────────────────────
+function render() {
+  const c = CONSTANTS[selectedKey];
+  if (lineIdx >= c.lines.length) lineIdx = 0;
+  const line = c.lines[lineIdx];
+
+  // CSS vars
+  document.documentElement.style.setProperty("--cclr", c.color);
+  document.documentElement.style.setProperty("--cclr15", c.color + "15");
+  document.documentElement.style.setProperty("--cclr50", c.color + "50");
+
+  $title.style.backgroundImage = `linear-gradient(135deg, ${c.color}, rgba(255,255,255,0.8))`;
+  $title.textContent = `Two Polynomials → ${c.symbol}`;
+  $desc.textContent = c.description;
+  $degree.textContent = c.degree;
+  $poly.textContent = c.polynomials;
+  $poly.style.color = c.color;
+  $sublabel.textContent = line.sublabel;
+  $tLabel.textContent = line.transformLabel;
+  $thSym.textContent = `→ ${c.symbol}`;
+  $rConv.style.color = c.color;
+
+  // Constant tabs
+  $constTabs.innerHTML = "";
+  for (const [key, cc] of Object.entries(CONSTANTS)) {
+    const btn = document.createElement("button");
+    btn.className = "tab" + (key === selectedKey ? " active" : "");
+    btn.textContent = cc.name;
+    btn.style.setProperty("--cclr", cc.color);
+    btn.style.setProperty("--cclr15", cc.color + "15");
+    btn.style.setProperty("--cclr50", cc.color + "50");
+    if (key === selectedKey) {
+      btn.style.background = cc.color + "15";
+      btn.style.borderColor = cc.color + "50";
+      btn.style.color = cc.color;
+    }
+    btn.onclick = () => { selectedKey = key; lineIdx = 0; render(); };
+    $constTabs.appendChild(btn);
+  }
+
+  // Line tabs
+  $lineTabs.innerHTML = "";
+  if (c.lines.length > 1) {
+    c.lines.forEach((l, i) => {
+      const btn = document.createElement("button");
+      btn.className = "tab" + (i === lineIdx ? " active" : "");
+      btn.textContent = l.label;
+      if (i === lineIdx) {
+        btn.style.background = "rgba(255,255,255,0.06)";
+        btn.style.borderColor = c.color + "40";
+        btn.style.color = c.color;
+      }
+      btn.onclick = () => { lineIdx = i; render(); };
+      $lineTabs.appendChild(btn);
+    });
+  }
+
+  // Compute
+  let steps;
+  if (line.custom) {
+    steps = line.compute(numTerms);
+  } else {
+    steps = evalGCF(line.a0, line.a, line.b, numTerms);
+  }
+
+  const transformed = steps.map(s => ({ n: s.n, raw: s.val, val: line.transform(s.val) }));
+  const last = transformed[transformed.length - 1];
+  const converged = last ? last.val : NaN;
+  const error = last ? Math.abs(converged - c.target) : NaN;
+
+  $rConv.textContent = isFinite(converged) ? converged.toFixed(14) : "—";
+  $rKnown.textContent = c.target.toFixed(14);
+  $rErr.textContent = isFinite(error) ? error.toExponential(3) : "—";
+  $rErr.style.color = error < 1e-10 ? "#4ade80" : error < 1e-5 ? "#facc15" : "#ef4444";
+
+  // Table
+  const tableRows = transformed.filter((_, i) => i <= 12 || i === transformed.length - 1);
+  $tbody.innerHTML = "";
+  for (const s of tableRows) {
+    const err = Math.abs(s.val - c.target);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="color:rgba(255,255,255,0.4)">${s.n}</td>
+      <td style="text-align:right;color:rgba(255,255,255,0.35)">${isFinite(s.raw)?s.raw.toFixed(8):"—"}</td>
+      <td style="text-align:right;color:${c.color}">${isFinite(s.val)?s.val.toFixed(12):"diverging…"}</td>
+      <td style="text-align:right;color:${err<1e-10?"#4ade80":err<1e-5?"#facc15":"#ef4444"}">${isFinite(err)?err.toExponential(2):"—"}</td>
+    `;
+    $tbody.appendChild(tr);
+  }
+
+  // Insight
+  if (c.lines.length > 1) {
+    $insight.style.display = "block";
+    $insight.style.background = c.color + "08";
+    $insight.style.border = `1px solid ${c.color}18`;
+    $insightLabel.style.color = c.color;
+  } else {
+    $insight.style.display = "none";
+  }
+
+  // Draw graph
+  drawGraph(transformed, c, numTerms);
+}
+
+function drawGraph(data, constant, maxN) {
+  const dpr = window.devicePixelRatio || 1;
+  const W = 900, H = 320;
+  $canvas.width = W * dpr;
+  $canvas.height = H * dpr;
+  $canvas.style.width = W + "px";
+  $canvas.style.height = "auto";
+  const ctx = $canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+
+  const pad = { top: 28, right: 28, bottom: 38, left: 68 };
+  const gW = W - pad.left - pad.right;
+  const gH = H - pad.top - pad.bottom;
+
+  const vals = data.map(s => s.val).filter(v => isFinite(v));
+  if (!vals.length) return;
+  const target = constant.target;
+  let minV = Math.min(...vals, target), maxV = Math.max(...vals, target);
+  const range = maxV - minV || 1;
+  minV -= range * 0.12; maxV += range * 0.12;
+
+  ctx.fillStyle = "#08080d"; ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = "rgba(255,255,255,0.035)"; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + (gH * i) / 5;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    const x = pad.left + (gW * i) / 5;
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + gH); ctx.stroke();
+  }
+
+  // Target line
+  const tY = pad.top + gH * (1 - (target - minV) / (maxV - minV));
+  ctx.strokeStyle = constant.color; ctx.globalAlpha = 0.25; ctx.lineWidth = 1;
+  ctx.setLineDash([3, 5]);
+  ctx.beginPath(); ctx.moveTo(pad.left, tY); ctx.lineTo(W - pad.right, tY); ctx.stroke();
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+  // Target label
+  ctx.fillStyle = constant.color; ctx.globalAlpha = 0.6;
+  ctx.font = "10px monospace"; ctx.textAlign = "right";
+  ctx.fillText(`${constant.symbol} = ${target.toFixed(10)}`, W - pad.right - 4, tY - 6);
+  ctx.globalAlpha = 1;
+
+  // Line glow
+  ctx.strokeStyle = constant.color; ctx.lineWidth = 3; ctx.globalAlpha = 0.15;
+  ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    if (!isFinite(data[i].val)) continue;
+    const x = pad.left + (gW * data[i].n) / maxN;
+    const y = pad.top + gH * (1 - (data[i].val - minV) / (maxV - minV));
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Line main
+  ctx.lineWidth = 1.5; ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    if (!isFinite(data[i].val)) continue;
+    const x = pad.left + (gW * data[i].n) / maxN;
+    const y = pad.top + gH * (1 - (data[i].val - minV) / (maxV - minV));
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // Dots
+  for (let i = 0; i < data.length; i++) {
+    if (!isFinite(data[i].val)) continue;
+    const x = pad.left + (gW * data[i].n) / maxN;
+    const y = pad.top + gH * (1 - (data[i].val - minV) / (maxV - minV));
+    ctx.fillStyle = constant.color;
+    ctx.globalAlpha = 0.3 + 0.7 * (i / data.length);
+    ctx.beginPath(); ctx.arc(x, y, i === data.length - 1 ? 3.5 : 2, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Axes
+  ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.font = "9px monospace";
+  ctx.textAlign = "center"; ctx.fillText("n (terms)", pad.left + gW / 2, H - 6);
+  ctx.textAlign = "right";
+  for (let i = 0; i <= 4; i++) {
+    const v = minV + ((maxV - minV) * (4 - i)) / 4;
+    ctx.fillText(v.toFixed(4), pad.left - 6, pad.top + (gH * i) / 4 + 3);
+  }
+  ctx.textAlign = "center";
+  for (let i = 0; i <= 4; i++) {
+    const n = Math.round((maxN * i) / 4);
+    ctx.fillText(n.toString(), pad.left + (gW * i) / 4, H - pad.bottom + 18);
+  }
+}
+
+// ─── Events ────────────────────────────────────────────────
+$slider.oninput = () => {
+  numTerms = +$slider.value;
+  $termCount.textContent = numTerms;
+  render();
+};
+
+// ─── Init ──────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>

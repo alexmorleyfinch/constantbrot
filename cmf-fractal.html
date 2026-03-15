@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Constantbrot — CMF Fractal Explorer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #06060b; color: #d4d4dc; min-height: 100vh;
+    font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+    padding: 16px; display: flex; flex-direction: column; align-items: center;
+  }
+  .sup { font-size: 18px; letter-spacing: 5px; color: rgba(255,255,255,0.2); text-transform: uppercase; text-align: center; }
+  h1 {
+    font-size: 44px; font-weight: 300; margin: 4px 0; text-align: center;
+    background: linear-gradient(135deg, #f472b6, #fb923c, #a78bfa, #22d3ee);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .desc { font-size: 18px; color: rgba(255,255,255,0.3); max-width: 500px; text-align: center; line-height: 1.5; margin: 0 auto; }
+  .controls {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    margin: 12px 0; align-items: center;
+  }
+  .ctrl-group { display: flex; flex-direction: column; align-items: center; }
+  .ctrl-label { font-size: 16px; letter-spacing: 2px; color: rgba(255,255,255,0.25); text-transform: uppercase; }
+  input[type="range"] { width: 120px; }
+  button {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    color: #aaa; padding: 6px 12px; border-radius: 4px; cursor: pointer;
+    font-size: 22px; font-family: inherit;
+  }
+  button:hover { background: rgba(255,255,255,0.08); }
+  .formula { text-align: center; margin-bottom: 10px; font-size: 22px; color: rgba(255,255,255,0.4); }
+  .formula .A { color: #f472b6; } .formula .B { color: #fb923c; }
+  .canvas-area { position: relative; margin-bottom: 10px; }
+  #fractal { image-rendering: pixelated; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); cursor: crosshair; }
+  .axis-x { text-align: center; font-size: 18px; color: rgba(255,255,255,0.25); margin-top: 4px; }
+  .axis-y {
+    position: absolute; top: 0; left: -40px; bottom: 0; display: flex; align-items: center;
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    font-size: 18px; color: rgba(255,255,255,0.25);
+  }
+  .progress-bar { position: absolute; bottom: 8px; left: 8px; right: 8px; height: 3px; background: rgba(0,0,0,0.5); border-radius: 2px; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #f472b6, #fb923c); border-radius: 2px; transition: width 0.1s; }
+  .hover-box {
+    min-height: 56px; max-width: 500px; width: 100%;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;
+  }
+  .hover-coords { font-size: 20px; color: rgba(255,255,255,0.3); margin-bottom: 4px; }
+  .hover-val { font-size: 28px; color: #f472b6; font-weight: 500; }
+  .hover-info { font-size: 20px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+  .hover-empty { font-size: 22px; color: rgba(255,255,255,0.2); text-align: center; }
+  .legend { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+  .legend-label { font-size: 18px; color: rgba(255,255,255,0.35); }
+  .zoom-info { text-align: center; font-size: 18px; color: rgba(255,255,255,0.15); }
+  .float-nav {
+    position: fixed; top: 12px; right: 12px; z-index: 1000;
+    display: inline-flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, #ec4899 0%, #f97316 40%, #8b5cf6 100%);
+    padding: 12px 18px; font-size: 15px; font-weight: 800; font-family: inherit;
+    text-decoration: none; color: #fff; letter-spacing: 5px; text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+  <a href="cmf-explorer.html" class="float-nav">→ Explorer</a>
+
+<div class="sup">Conservative Matrix Field</div>
+<h1>The Constantbrot</h1>
+<div class="desc">Each pixel maps parameters (A, B) to a polynomial continued fraction. Color = what constant emerges. Click to zoom. Dark = divergence.</div>
+
+<div class="controls">
+  <div class="ctrl-group">
+    <span class="ctrl-label">C parameter: <span id="c-val">0</span></span>
+    <input type="range" id="c-slider" min="-5" max="5" step="1" value="0" style="accent-color:#f472b6">
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Iterations: <span id="iter-val">40</span></span>
+    <input type="range" id="iter-slider" min="15" max="80" value="40" style="accent-color:#fb923c">
+  </div>
+  <button id="btn-out">Zoom Out</button>
+  <button id="btn-reset">Reset</button>
+</div>
+
+<div class="formula">
+  a(k) = k³+(k+1)³ + <span class="A">A</span>k² + <span class="B">B</span>k + <span id="c-display">0</span>
+  &nbsp;│&nbsp; b(k) = −k⁶
+</div>
+
+<div class="canvas-area" id="canvas-area">
+  <canvas id="fractal"></canvas>
+  <div class="progress-bar" id="pbar" style="display:none"><div class="progress-fill" id="pfill"></div></div>
+  <div class="axis-x" id="axis-x"></div>
+  <div class="axis-y" id="axis-y"></div>
+</div>
+
+<div class="ctrl-group" style="margin-bottom:12px">
+  <span class="ctrl-label">Resolution: <span id="res-val">400</span>px</span>
+  <input type="range" id="res-slider" min="150" max="1500" step="25" value="400" style="accent-color:#a78bfa;width:180px">
+</div>
+
+<div class="hover-box" id="hover-box">
+  <div class="hover-empty">Hover over the fractal to inspect values. Click to zoom in.</div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:hsl(330,85%,45%)"></div><span class="legend-label">ζ(3) region</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:hsl(30,85%,45%)"></div><span class="legend-label">π region</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:hsl(270,85%,45%)"></div><span class="legend-label">e region</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:hsl(180,85%,45%)"></div><span class="legend-label">ln(2) region</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:hsl(120,85%,45%)"></div><span class="legend-label">ζ(2) region</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:#08080f;border:1px solid rgba(255,255,255,0.15)"></div><span class="legend-label">divergent</span></div>
+</div>
+
+<div class="zoom-info" id="zoom-info">Zoom: 1.0x │ Center: (0.00, 0.00) │ Each pixel = one continued fraction</div>
+
+<script>
+// ─── Known constants for hue mapping ────────────────────────
+const KNOWN = [
+  { name:"ζ(3)", val:1.2020569031595942, hue:330 },
+  { name:"1/ζ(3)", val:0.8319073725807, hue:330 },
+  { name:"π", val:Math.PI, hue:30 },
+  { name:"e", val:Math.E, hue:270 },
+  { name:"ln(2)", val:Math.log(2), hue:180 },
+  { name:"φ", val:1.6180339887, hue:60 },
+  { name:"π²/6", val:Math.PI*Math.PI/6, hue:120 },
+  { name:"Catalan", val:0.9159655941, hue:200 },
+];
+
+// ─── Evaluate one pixel ─────────────────────────────────────
+function evalCF(A, B, C, maxIter) {
+  const a0 = 1 + C;
+  if (a0 === 0) return { converged: false, val: NaN, iters: 0 };
+  let pP=1, pC2=a0, qP=0, qC2=1, prev=a0;
+  for (let k = 1; k <= maxIter; k++) {
+    const ak = k*k*k + (k+1)*(k+1)*(k+1) + A*k*k + B*k + C;
+    const bk = -(k*k*k*k*k*k);
+    const pN=ak*pC2+bk*pP, qN=ak*qC2+bk*qP;
+    pP=pC2; qP=qC2; pC2=pN; qC2=qN;
+    if (Math.abs(pC2)>1e150||Math.abs(qC2)>1e150) {
+      const s=Math.max(Math.abs(pC2),Math.abs(qC2));
+      if(s===0)return{converged:false,val:NaN,iters:k};
+      pC2/=s;qC2/=s;pP/=s;qP/=s;
+    }
+    if(!isFinite(pC2)||!isFinite(qC2)||qC2===0)return{converged:false,val:NaN,iters:k};
+    const r=pC2/qC2;
+    if(k>3&&Math.abs(r-prev)<1e-10)return{converged:true,val:r,iters:k};
+    prev=r;
+  }
+  return{converged:Math.abs(pC2/qC2-prev)<1e-6, val:pC2/qC2, iters:maxIter};
+}
+
+// ─── Color ──────────────────────────────────────────────────
+function hsl2rgb(h,s,l){
+  h/=360;s/=100;l/=100;
+  if(s===0)return[Math.round(l*255),Math.round(l*255),Math.round(l*255)];
+  const hue2rgb=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};
+  const q=l<0.5?l*(1+s):l+s-l*s, p=2*l-q;
+  return[Math.round(hue2rgb(p,q,h+1/3)*255),Math.round(hue2rgb(p,q,h)*255),Math.round(hue2rgb(p,q,h-1/3)*255)];
+}
+
+function getColor(res, maxIter) {
+  if(!res.converged||!isFinite(res.val)||isNaN(res.val))return[5,5,12];
+  const v=res.val, speed=1-(res.iters/maxIter);
+  let bestD=Infinity, bestH=0;
+  for(const k of KNOWN){
+    let d=Math.abs(v-k.val);if(d<bestD){bestD=d;bestH=k.hue;}
+    d=isFinite(1/v)?Math.abs(1/v-k.val):Infinity;if(d<bestD){bestD=d;bestH=k.hue;}
+  }
+  let h,s,l;
+  if(bestD<0.01){h=bestH;s=85+15*(1-bestD/0.01);l=35+30*speed;}
+  else if(bestD<0.5){h=bestH;s=40+30*(1-bestD/0.5);l=25+25*speed;}
+  else{h=(Math.abs(v)%10)/10*360;s=50+30*speed;l=20+30*speed;}
+  return hsl2rgb(h,s,l);
+}
+
+// ─── State ──────────────────────────────────────────────────
+let centerA=0, centerB=0, zoom=1, C=0, maxIter=40, resolution=400;
+let rendering=false, cancelRender=false;
+
+// ─── DOM ────────────────────────────────────────────────────
+const $fractal=document.getElementById("fractal");
+const $pbar=document.getElementById("pbar");
+const $pfill=document.getElementById("pfill");
+const $axisX=document.getElementById("axis-x");
+const $axisY=document.getElementById("axis-y");
+const $hoverBox=document.getElementById("hover-box");
+const $zoomInfo=document.getElementById("zoom-info");
+const $cVal=document.getElementById("c-val");
+const $cDisp=document.getElementById("c-display");
+const $iterVal=document.getElementById("iter-val");
+const $resVal=document.getElementById("res-val");
+
+function updateAxes() {
+  const rA=10/zoom, rB=10/zoom;
+  $axisX.textContent=`A → [${(centerA-rA/2).toFixed(1)}, ${(centerA+rA/2).toFixed(1)}]`;
+  $axisY.textContent=`B → [${(centerB-rB/2).toFixed(1)}, ${(centerB+rB/2).toFixed(1)}]`;
+  $zoomInfo.textContent=`Zoom: ${zoom.toFixed(1)}x │ Center: (${centerA.toFixed(2)}, ${centerB.toFixed(2)}) │ Each pixel = one continued fraction`;
+}
+
+// ─── Render fractal ─────────────────────────────────────────
+function renderFractal() {
+  cancelRender = true;
+  setTimeout(() => {
+    cancelRender = false;
+    doRender();
+  }, 20);
+}
+
+function doRender() {
+  const W=resolution, H=resolution;
+  $fractal.width=W; $fractal.height=H;
+  const displaySize = Math.min(1000, resolution * 1.6);
+  $fractal.style.width=displaySize+"px";
+  $fractal.style.height=displaySize+"px";
+  const ctx=$fractal.getContext("2d");
+  const imgData=ctx.createImageData(W,H);
+  const data=imgData.data;
+
+  const rA=10/zoom, rB=10/zoom;
+  const minA=centerA-rA/2, minB=centerB-rB/2;
+
+  $pbar.style.display="block";
+  rendering=true;
+  let row=0;
+  const batchSize=4;
+
+  function batch(){
+    if(cancelRender){rendering=false;$pbar.style.display="none";return;}
+    const end=Math.min(row+batchSize,H);
+    for(let y=row;y<end;y++){
+      for(let x=0;x<W;x++){
+        const A=minA+(x/W)*rA, B=minB+(y/H)*rB;
+        const res=evalCF(A,B,C,maxIter);
+        const[r,g,b]=getColor(res,maxIter);
+        const idx=(y*W+x)*4;
+        data[idx]=r;data[idx+1]=g;data[idx+2]=b;data[idx+3]=255;
+      }
+    }
+    row=end;
+    ctx.putImageData(imgData,0,0);
+    $pfill.style.width=(row/H*100)+"%";
+    if(row<H)requestAnimationFrame(batch);
+    else{rendering=false;$pbar.style.display="none";}
+  }
+  batch();
+  updateAxes();
+}
+
+// ─── Interaction ────────────────────────────────────────────
+$fractal.addEventListener("click", e => {
+  const rect=$fractal.getBoundingClientRect();
+  const x=(e.clientX-rect.left)/rect.width, y=(e.clientY-rect.top)/rect.height;
+  const rA=10/zoom, rB=10/zoom;
+  centerA=(centerA-rA/2)+x*rA;
+  centerB=(centerB-rB/2)+y*rB;
+  zoom*=2.5;
+  renderFractal();
+});
+
+$fractal.addEventListener("mousemove", e => {
+  const rect=$fractal.getBoundingClientRect();
+  const x=(e.clientX-rect.left)/rect.width, y=(e.clientY-rect.top)/rect.height;
+  const rA=10/zoom, rB=10/zoom;
+  const A=(centerA-rA/2)+x*rA, B=(centerB-rB/2)+y*rB;
+  const res=evalCF(A,B,C,maxIter);
+
+  if(res.converged&&isFinite(res.val)){
+    let note="unknown constant territory";
+    const v=res.val;
+    for(const k of KNOWN){
+      if(Math.abs(v-k.val)<0.01){note=`near ${k.name}!`;break;}
+      if(isFinite(1/v)&&Math.abs(1/v-k.val)<0.01){note=`1/v near ${k.name}!`;break;}
+    }
+    $hoverBox.innerHTML=`
+      <div class="hover-coords">A = ${A.toFixed(4)}, B = ${B.toFixed(4)}</div>
+      <div class="hover-val">${res.val.toFixed(12)}</div>
+      <div class="hover-info">Converged in ${res.iters} iterations — ${note}</div>`;
+  } else {
+    $hoverBox.innerHTML=`
+      <div class="hover-coords">A = ${A.toFixed(4)}, B = ${B.toFixed(4)}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.2)">Divergent or slow convergence</div>`;
+  }
+});
+
+$fractal.addEventListener("mouseleave", () => {
+  $hoverBox.innerHTML=`<div class="hover-empty">Hover over the fractal to inspect values. Click to zoom in.</div>`;
+});
+
+document.getElementById("btn-out").onclick=()=>{zoom=Math.max(0.1,zoom/2.5);renderFractal();};
+document.getElementById("btn-reset").onclick=()=>{centerA=0;centerB=0;zoom=1;renderFractal();};
+
+document.getElementById("c-slider").oninput=function(){
+  C=+this.value;$cVal.textContent=C;$cDisp.textContent=C;renderFractal();
+};
+document.getElementById("iter-slider").oninput=function(){
+  maxIter=+this.value;$iterVal.textContent=maxIter;renderFractal();
+};
+document.getElementById("res-slider").oninput=function(){
+  resolution=+this.value;$resVal.textContent=resolution;renderFractal();
+};
+
+// ─── Init ───────────────────────────────────────────────────
+renderFractal();
+</script>
+</body>
+</html>
